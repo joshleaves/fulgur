@@ -5,7 +5,7 @@
  * only that application's appcast URL is purged.
  */
 
-export const APPCAST_S_MAXAGE = 86_400 // 24h fallback TTL; successful publishes explicitly purge the appcast.
+export const APPCAST_S_MAXAGE = 60 // 1mn fallback TTL; successful publishes explicitly purge the appcast.
 export const IMMUTABLE_CACHE = 'public, max-age=31536000, immutable'
 
 /** Canonical GET-only key shared by every appcast cache operation. */
@@ -31,7 +31,9 @@ export class AppcastCache {
   }
 
   match(): Promise<Response | undefined> {
-    return caches.default.match(this.key)
+    return Promise.resolve(undefined)
+    // TODO: Re-enable after beta-testing phase
+    // return caches.default.match(this.key)
   }
 
   put(response: Response): Promise<void> {
