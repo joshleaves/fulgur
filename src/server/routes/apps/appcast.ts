@@ -8,7 +8,7 @@ import type { AppBindings } from '#server/app.ts'
 export const appcastHandler = async (c: Context<AppBindings>): Promise<Response> => {
   const app = c.req.param('app')!.toLowerCase()
   const url = new URL(c.req.url)
-  const cache = new AppcastCache(c.req.url)
+  const cache = AppcastCache.forApp(app, new URL(c.req.url).origin)
 
   // Cache-first: a published appcast is served straight from the Cache API.
   const cached = await cache.match()

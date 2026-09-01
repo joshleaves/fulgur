@@ -8,15 +8,26 @@
 export const APPCAST_S_MAXAGE = 86_400 // 24h fallback TTL; successful publishes explicitly purge the appcast.
 export const IMMUTABLE_CACHE = 'public, max-age=31536000, immutable'
 
+/** Canonical GET-only key shared by every appcast cache operation. */
+export const appcastCacheKey = (app: string, origin: string): Request => {
+  const base = new URL(origin)
+  base.search = ''
+  base.hash = ''
+  base.pathname = `/apps/${encodeURIComponent(app.toLowerCase())}/appcast.xml`
+  return new Request(base.toString(), { method: 'GET' })
+}
+
 export class AppcastCache {
   private readonly key: Request
 
   constructor(request: Request | string) {
     const url = new URL(typeof request === 'string' ? request : request.url)
+    const appMatch = /^\/apps\/([^/]+)\/appcast\.xml$/.exec(url.pathname)
+    this.key = appMatch ? appcastCacheKey(decodeURIComponent(appMatch[1]), url.origin) : new Request(url.origin + url.pathname)
+  }
 
-    url.search = ''
-
-    this.key = new Request(url.toString())
+  static forApp(app: string, origin: string): AppcastCache {
+    return new AppcastCache(appcastCacheKey(app, origin))
   }
 
   match(): Promise<Response | undefined> {

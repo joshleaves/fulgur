@@ -28,8 +28,12 @@ export const publishArtifactHandler = async (c: Context<AppBindings>): Promise<R
   })
   if (doResponse.status === 201) {
     const origin = new URL(c.req.url).origin
-    const cache = new AppcastCache(`${origin}/apps/${app}/appcast.xml`)
-    c.executionCtx.waitUntil(cache.purge())
+    const cache = AppcastCache.forApp(app, origin)
+    c.executionCtx.waitUntil(
+      cache.purge().then((deleted) => {
+        if (!deleted) console.warn(`appcast cache purge missed: ${app}`)
+      }),
+    )
 
     const zoneCache = new ZoneCache({
       zoneId: c.env.ZONE_CACHE_ZONE_ID,

@@ -153,6 +153,57 @@ describe('publish lifecycle (two-request, release_id flow)', () => {
     expect(xml).toContain('notes.html')
   })
 
+  it('invalidates the cached appcast after a newer publish and reuses the refreshed cache', async () => {
+    const first = await SELF.fetch(appcastUrl('foo'))
+    expect(await first.text()).toContain('<sparkle:version>1.2.3</sparkle:version>')
+
+    const rid = 'rid-cache-refresh-01'
+    const session = await SELF.fetch(sessionUrl('foo', rid), {
+      method: 'POST',
+      headers: { ...authHeader(TOK_FOO), 'content-type': 'application/json' },
+      body: JSON.stringify(validMetadata('1.3.0')),
+    })
+    expect(session.status).toBe(201)
+    const publish = await SELF.fetch(artifactUrl('foo', rid), {
+      method: 'PUT',
+      headers: authHeader(TOK_FOO),
+      body: new Uint8Array(8),
+    })
+    expect(publish.status).toBe(201)
+
+    const refreshed = await SELF.fetch(appcastUrl('foo'))
+    const refreshedXml = await refreshed.text()
+    expect(refreshedXml).toContain('<sparkle:version>1.3.0</sparkle:version>')
+    expect(refreshedXml).toContain('<sparkle:version>1.2.3</sparkle:version>')
+
+    const cached = await SELF.fetch(appcastUrl('foo'))
+    expect(await cached.text()).toBe(refreshedXml)
+  })
+
+  it('does not purge an unrelated appcast after publishing', async () => {
+    const before = await SELF.fetch(appcastUrl('bar'))
+    expect(before.status).toBe(404)
+
+    const rid = 'rid-cache-isolation'
+    expect(
+      (await SELF.fetch(sessionUrl('foo', rid), {
+        method: 'POST',
+        headers: { ...authHeader(TOK_FOO), 'content-type': 'application/json' },
+        body: JSON.stringify(validMetadata('2.1.0')),
+      })).status,
+    ).toBe(201)
+    expect(
+      (await SELF.fetch(artifactUrl('foo', rid), {
+        method: 'PUT',
+        headers: authHeader(TOK_FOO),
+        body: new Uint8Array(8),
+      })).status,
+    ).toBe(201)
+
+    const after = await SELF.fetch(appcastUrl('bar'))
+    expect(await after.text()).toContain('<sparkle:version>0.9.0</sparkle:version>')
+  })
+
   it('serves embedded release notes immutably cached', async () => {
     const res = await SELF.fetch(`${BASE}/apps/foo/releases/1.2.3/notes.html`)
     expect(res.status).toBe(200)

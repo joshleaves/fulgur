@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { AppcastCache } from '#src/AppcastCache.ts'
+import { AppcastCache, appcastCacheKey } from '#src/AppcastCache.ts'
 import { ZoneCache } from '#src/ZoneCache.ts'
 
 const match = vi.fn(async (_request: Request): Promise<Response | undefined> => undefined)
@@ -35,10 +35,22 @@ describe('AppcastCache', () => {
     expect(key.url).toBe('https://updates.example.com/apps/foo/appcast.xml')
   })
 
-  it('uses the same canonical cache behavior for notes', async () => {
-    await new AppcastCache('https://updates.example.com/apps/foo/releases/1.0.0/notes.html?ignored=true').match()
+  it('uses one canonical GET key for read, write, and purge', async () => {
+    const origin = 'https://updates.example.com/'
+    await AppcastCache.forApp('Foo', origin).match()
+    await AppcastCache.forApp('foo', origin).put(new Response('new'))
+    await AppcastCache.forApp('foo', origin).purge()
 
-    expect(match.mock.calls[0][0].url).toBe('https://updates.example.com/apps/foo/releases/1.0.0/notes.html')
+    expect(match.mock.calls[0][0].url).toBe(appcastCacheKey('foo', origin).url)
+    expect(put.mock.calls[0][0].url).toBe(appcastCacheKey('foo', origin).url)
+    expect(remove.mock.calls[0][0].url).toBe(appcastCacheKey('foo', origin).url)
+    expect(match.mock.calls[0][0].method).toBe('GET')
+  })
+
+  it('encodes app slugs and strips query and hash from the key', () => {
+    expect(appcastCacheKey('foo/bar', 'http://updates.example.com/?x=1#hash').url).toBe(
+      'http://updates.example.com/apps/foo%2Fbar/appcast.xml',
+    )
   })
 
   it('returns the response matched by the Cache API', async () => {
@@ -107,6 +119,15 @@ describe('AppcastCache', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     await expect(new ZoneCache({ zoneId: 'zone-id', token: 'token', origin: 'https://updates.example.com' }).purgeAppcast('foo')).resolves.toBe(false)
+  })
+
+  it('does not use request headers as part of the cache key', async () => {
+    const request = new Request('https://updates.example.com/apps/foo/appcast.xml?channel=beta', {
+      method: 'GET',
+      headers: { 'if-none-match': 'old', range: 'bytes=0-10' },
+    })
+    await new AppcastCache(request).match()
+    expect(match.mock.calls[0][0].headers).toEqual(new Headers())
   })
 
   it('returns whether the canonical cache entry was purged', async () => {
