@@ -2,15 +2,53 @@
   "name": "fulgur",
   "version": "0.0.0",
   "private": true,
+  "license": "MIT",
+  "author": {
+    "name": "Arnaud 'red' Rouyer",
+    "url": "https://github.com/joshleaves"
+  },
+  "description": "Cloudflare-native update server for Sparkle",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/<user>/fulgur.git"
+  },
+  "type": "module",
+  "keywords": [
+    "sparkle",
+    "macos",
+    "updates",
+    "cloudflare",
+    "workers"
+  ],
+  "imports": {
+    "#coordinator/*": "./src/coordinator/*",
+    "#database": "./src/database.ts",
+    "#server/*": "./src/server/*",
+    "#src/*": "./src/*"
+  },
   "scripts": {
     "deploy": "wrangler deploy",
     "dev": "wrangler dev",
     "start": "wrangler dev",
-    "cf-typegen": "wrangler types"
+    "cf-typegen": "wrangler types",
+    "test": "vitest run",
+    "check": "npm run lint && npm run typecheck && npm run test",
+    "check:fix": "npm run lint:fix && npm run typecheck && npm run test",
+    "lint": "oxlint",
+    "lint:ci": "oxlint --deny-warnings",
+    "lint:fix": "oxlint --fix",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "hono": "^4.13.5"
   },
   "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.22.0",
+    "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "^26.4.0",
-    "typescript": "^5.5.2",
+    "oxlint": "^1.80.0",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11",
     "wrangler": "^4.127.1"
   }
 }
