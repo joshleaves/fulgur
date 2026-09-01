@@ -179,6 +179,24 @@ describe('publish lifecycle (two-request, release_id flow)', () => {
     expect(cached.status).toBe(304)
   })
 
+  it('honors a matching If-Range ETag', async () => {
+    const initial = await SELF.fetch(`${BASE}/apps/foo/releases/1.2.3/Foo.zip`)
+    const etag = initial.headers.get('etag')!
+    const res = await SELF.fetch(`${BASE}/apps/foo/releases/1.2.3/Foo.zip`, {
+      headers: { range: 'bytes=0-99', 'if-range': etag },
+    })
+    expect(res.status).toBe(206)
+    expect((await res.arrayBuffer()).byteLength).toBe(100)
+  })
+
+  it('ignores Range for a non-matching If-Range ETag', async () => {
+    const res = await SELF.fetch(`${BASE}/apps/foo/releases/1.2.3/Foo.zip`, {
+      headers: { range: 'bytes=0-99', 'if-range': '"different-etag"' },
+    })
+    expect(res.status).toBe(200)
+    expect((await res.arrayBuffer()).byteLength).toBe(64 * 1024)
+  })
+
   it('supports a single byte range while streaming the artifact', async () => {
     const res = await SELF.fetch(`${BASE}/apps/foo/releases/1.2.3/Foo.zip`, {
       headers: { range: 'bytes=0-99' },

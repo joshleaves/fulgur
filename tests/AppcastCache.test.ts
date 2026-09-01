@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppcastCache } from '#src/AppcastCache.ts'
+import { ZoneCache } from '#src/ZoneCache.ts'
 
 const match = vi.fn(async (_request: Request): Promise<Response | undefined> => undefined)
 const put = vi.fn(async (_request: Request, _response: Response): Promise<void> => {})
@@ -14,10 +15,12 @@ beforeEach(() => {
       delete: remove,
     },
   })
+  vi.spyOn(console, 'warn').mockImplementation(() => {})
 })
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.restoreAllMocks()
 })
 
 describe('AppcastCache', () => {
@@ -58,6 +61,52 @@ describe('AppcastCache', () => {
     expect(storedResponse.headers.get('content-type')).toBe('application/xml')
     await expect(storedResponse.text()).resolves.toBe('<rss />')
     await expect(response.text()).resolves.toBe('<rss />')
+  })
+
+  it('reports partial zone-cache configuration as an error', () => {
+    expect(new ZoneCache({ zoneId: 'zone-id' }).configurationError).toBeTruthy()
+    expect(new ZoneCache({ zoneId: 'zone-id' }).enabled).toBe(false)
+  })
+
+  it('does not call Cloudflare when zone caching is not configured', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(new ZoneCache({}).purgeAppcast('foo')).resolves.toBe(false)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('purges one appcast URL through the zone API when configured', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ success: true }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      new ZoneCache({ zoneId: 'zone-id', token: 'token', origin: 'https://updates.example.com/' }).purgeAppcast('foo/bar'),
+    ).resolves.toBe(true)
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.cloudflare.com/client/v4/zones/zone-id/purge_cache',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({ authorization: 'Bearer token' }),
+        body: JSON.stringify({ files: ['https://updates.example.com/apps/foo%2Fbar/appcast.xml'] }),
+      }),
+    )
+  })
+
+  it('does not expose the zone token when the purge API fails', async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new Error('network failure'))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(new ZoneCache({ zoneId: 'zone-id', token: 'secret-token', origin: 'https://updates.example.com' }).purgeAppcast('foo')).resolves.toBe(false)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns false when the zone purge API fails', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 403 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(new ZoneCache({ zoneId: 'zone-id', token: 'token', origin: 'https://updates.example.com' }).purgeAppcast('foo')).resolves.toBe(false)
   })
 
   it('returns whether the canonical cache entry was purged', async () => {

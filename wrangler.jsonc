@@ -34,15 +34,19 @@
 	"d1_databases": [
 		{
 			"binding": "DB",
-			"database_name": "fulgur-db",
-			"database_id": "00000000-0000-0000-0000-000000000000"
+			"database_name": "fulgur-db"
 		}
 	],
 
 	"observability": {
 		"enabled": true
 	},
-	"upload_source_maps": true
+	"upload_source_maps": true,
+
+	/** Optional zone CDN purge configuration. Set these as vars/secrets only when enabled. */
+	"vars": {
+		"ZONE_CACHE_ORIGIN": ""
+	}
 
 	/**
 	 * Publishing tokens are Worker secrets, one per application:

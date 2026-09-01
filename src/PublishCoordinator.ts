@@ -253,11 +253,15 @@ export class PublishCoordinator extends DurableObject<Env> {
         release_notes_signature: meta.release_notes_signature ?? null,
         published_at: publishedAt,
       })
-    } catch (err) {
-      // D1 commit failed: the artifact is in R2 but unreferenced
-      // (orphan — safe, no release row points at it). Release the lock
-      // so a retry can republish.
-      console.warn("publish D1 commit failed", err)
+    } catch {
+      // The object did not exist before this attempt, so best-effort cleanup
+      // makes the version retryable after a D1 failure.
+      try {
+        await this.env.ARTIFACTS.delete(r2Key)
+      } catch {
+        console.warn('publish artifact cleanup failed after D1 commit failure')
+      }
+      console.warn('publish D1 commit failed')
       await this.ctx.storage.delete(SESSION_KEY)
       await this.ctx.storage.deleteAlarm()
       return json(502, {

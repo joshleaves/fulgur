@@ -1,5 +1,6 @@
 import type { Context } from 'hono'
 import { AppcastCache } from '#src/AppcastCache.ts'
+import { ZoneCache } from '#src/ZoneCache.ts'
 import { RELEASE_ID_RE, DO_BASE } from '#src/PublishCoordinator.ts'
 import type { AppBindings } from '#server/app.ts'
 
@@ -29,6 +30,13 @@ export const publishArtifactHandler = async (c: Context<AppBindings>): Promise<R
     const origin = new URL(c.req.url).origin
     const cache = new AppcastCache(`${origin}/apps/${app}/appcast.xml`)
     c.executionCtx.waitUntil(cache.purge())
+
+    const zoneCache = new ZoneCache({
+      zoneId: c.env.ZONE_CACHE_ZONE_ID,
+      token: c.env.ZONE_CACHE_TOKEN,
+      origin: c.env.ZONE_CACHE_ORIGIN,
+    })
+    c.executionCtx.waitUntil(zoneCache.purgeAppcast(app))
   }
   return doResponse
 }

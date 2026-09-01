@@ -163,6 +163,20 @@ bunx wrangler secret put PUBLISH_TIMEOUT_FOO        # per app, ms
 - **Artifacts** and embedded notes are immutable once published: `Cache-Control: public, max-age=31536000, immutable`.
 - The Cache API is the Worker's edge cache — no zone API token required. Because the Worker is the origin, targeted purge via the Cache API is sufficient for this deployment shape.
 
+### Optional zone CDN cache setup
+
+Wrangler can deploy the Worker and its bindings, but it cannot safely infer your production hostname or modify an existing zone's Cache Rules without zone configuration and credentials. Configure a Cache Rule manually (or through your own infrastructure automation):
+
+- Expression: `(http.request.uri.path matches "^/apps/[^/]+/appcast\\.xml$")`
+- Action: `set_cache_settings`
+- Cache: enabled / Cache Everything
+- Edge TTL: at least 86400 seconds
+- Ensure the custom domain DNS record is proxied through Cloudflare.
+
+Set `ZONE_CACHE_ORIGIN` to the canonical HTTPS origin, `ZONE_CACHE_ZONE_ID` to the zone ID, and store `ZONE_CACHE_TOKEN` as a Worker secret. The token should have only the zone-scoped `Cache Purge` permission. Do not use a Global API Key. If the purge call fails, Worker Cache API invalidation still runs and the next zone miss will refresh the feed.
+
+Zone CDN caching is a separate cache layer from `caches.default`; `caches.default.delete()` does not purge the zone CDN entry.
+
 ## Storage
 
 - **R2** — immutable artifacts at `{app}/{version}/{filename}`.

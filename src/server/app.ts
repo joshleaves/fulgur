@@ -30,7 +30,13 @@ import { rootHandler } from '#server/routes/root.ts'
 import appsServer from '#server/routes/apps/index.ts'
 import publishServer from '#server/routes/publish/index.ts'
 
-export type AppBindings = { Bindings: Env }
+export type AppBindings = {
+  Bindings: Env & {
+    ZONE_CACHE_ZONE_ID?: string
+    ZONE_CACHE_TOKEN?: string
+    ZONE_CACHE_ORIGIN?: string
+  }
+}
 
 const server = new Hono<AppBindings>()
 
